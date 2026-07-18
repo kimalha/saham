@@ -1,0 +1,21 @@
+{
+  "name": "spk-topsis-lq45",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "backend:dev": "npm run dev --workspace=backend",
+    "backend:build": "npm run build --workspace=backend",
+    "backend:start": "npm run start --workspace=backend",
+    "frontend:start": "npm run start --workspace=frontend",
+    "frontend:android": "npm run android --workspace=frontend",
+    "frontend:ios": "npm run ios --workspace=frontend",
+    "frontend:web": "npm run web --workspace=frontend"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  }
+}
