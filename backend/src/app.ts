@@ -1,4 +1,5 @@
 import express, { Application, Request, Response } from 'express';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRouter from './routes';
 import { errorHandler } from './middlewares/error.middleware';
@@ -8,6 +9,7 @@ dotenv.config();
 const app: Application = express();
 
 // Middlewares
+app.use(cors()); // Mengaktifkan CORS agar browser desktop diizinkan mengambil data dari backend port 5000
 app.use(express.json());
 
 // Routes API Utama

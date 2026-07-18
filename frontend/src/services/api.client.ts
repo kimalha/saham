@@ -3,8 +3,12 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 const getBaseUrl = (): string => {
-  // Mendeteksi IP lokal debugger host Metro Bundler (laptop host) secara otomatis.
-  // Ini memungkinkan HP fisik terhubung langsung ke port 5000 tanpa ganti hardcode IP.
+  // Jika dibuka di browser web desktop, langsung tembak localhost komputer induk.
+  if (Platform.OS === 'web') {
+    return 'http://127.0.0.1:5000/api';
+  }
+
+  // Jika dibuka di HP fisik (Expo Go), deteksi IP lokal komputer induk secara dinamis.
   const hostUri = Constants.expoConfig?.hostUri;
   if (hostUri) {
     const ip = hostUri.split(':')[0];
