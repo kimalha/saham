@@ -1,11 +1,48 @@
 import React from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, ActivityIndicator } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
+import { useStocks } from '../hooks/useStocks';
+import { useHistory } from '../hooks/useHistory';
 
 export default function DashboardScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { stocks, refetch: refetchStocks, isLoading: isStocksLoading } = useStocks();
+  const { historyList, refetch: refetchHistory, isLoading: isHistoryLoading } = useHistory();
+
+  // Muat ulang data setiap kali screen ini difokuskan
+  useFocusEffect(
+    React.useCallback(() => {
+      refetchStocks();
+      refetchHistory();
+    }, [refetchStocks, refetchHistory])
+  );
+
+  const lastAnalysis = historyList[0];
+  const totalStocks = stocks.length;
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch {
+      return '-';
+    }
+  };
+
+  if (isStocksLoading || isHistoryLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Memuat statistik...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -17,22 +54,40 @@ export default function DashboardScreen() {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Saham Terdaftar</Text>
-          <Text style={styles.statValue}>5 Saham</Text>
+          <Text style={styles.statValue}>{totalStocks} Saham</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Analisis Terakhir</Text>
-          <Text style={styles.statValue}>18-07-2026</Text>
+          <Text style={styles.statValue}>
+            {lastAnalysis ? formatDate(lastAnalysis.created_at) : 'Belum Ada'}
+          </Text>
         </View>
       </View>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Hasil Rekomendasi Terakhir</Text>
-        <View style={styles.divider} />
-        <Text style={styles.recommendationText}>#1 BBCA (V = 0.8920)</Text>
-        <Text style={styles.weightsText}>
-          Bobot: PE(25%) ROE(30%) DER(20%) DIV(25%)
-        </Text>
-      </View>
+      {lastAnalysis ? (
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Hasil Rekomendasi Terakhir</Text>
+          <View style={styles.divider} />
+          <Text style={styles.recommendationText}>{lastAnalysis.title}</Text>
+          <Text style={styles.weightsText}>
+            Bobot Kriteria: PE({lastAnalysis.weight_pe}%) ROE({lastAnalysis.weight_roe}%) DER({lastAnalysis.weight_der}%) DIV({lastAnalysis.weight_div}%)
+          </Text>
+          <Pressable
+            style={styles.viewDetailLink}
+            onPress={() =>
+              navigation.navigate('AnalysisResults', { historyId: lastAnalysis.id })
+            }
+          >
+            <Text style={styles.viewDetailLinkText}>Lihat Hasil Analisis &rarr;</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Hasil Rekomendasi Terakhir</Text>
+          <View style={styles.divider} />
+          <Text style={styles.placeholderText}>Belum ada riwayat simulasi analisis dijalankan.</Text>
+        </View>
+      )}
 
       <View style={styles.buttonContainer}>
         <Pressable
@@ -54,6 +109,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0B0F19',
     paddingHorizontal: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#0B0F19',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  loadingText: {
+    color: '#9CA3AF',
+    marginTop: 12,
+    fontSize: 14
   },
   header: {
     marginTop: 24,
@@ -121,6 +187,20 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 6,
   },
+  placeholderText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontStyle: 'italic'
+  },
+  viewDetailLink: {
+    marginTop: 14,
+    alignSelf: 'flex-start'
+  },
+  viewDetailLinkText: {
+    color: '#3B82F6',
+    fontSize: 14,
+    fontWeight: '600'
+  },
   buttonContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -132,7 +212,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48, // Touch target height >= 44
+    height: 48,
   },
   buttonText: {
     fontSize: 16,
