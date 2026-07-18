@@ -1,10 +1,16 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Di emulator Android, localhost dipetakan ke 10.0.2.2.
-// Untuk iOS / Web menggunakan 127.0.0.1.
-// Jika menggunakan HP fisik via Expo Go, sesuaikan IP ini dengan IP lokal komputer Anda (misal: 192.168.1.5).
 const getBaseUrl = (): string => {
+  // Mendeteksi IP lokal debugger host Metro Bundler (laptop host) secara otomatis.
+  // Ini memungkinkan HP fisik terhubung langsung ke port 5000 tanpa ganti hardcode IP.
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const ip = hostUri.split(':')[0];
+    return `http://${ip}:5000/api`;
+  }
+
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:5000/api';
   }
