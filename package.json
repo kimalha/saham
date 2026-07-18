@@ -11,6 +11,7 @@
     "backend:build": "npm run build --workspace=backend",
     "backend:start": "npm run start --workspace=backend",
     "frontend:start": "npm run start --workspace=frontend",
+    "frontend:tunnel": "npm run start:tunnel --workspace=frontend",
     "frontend:android": "npm run android --workspace=frontend",
     "frontend:ios": "npm run ios --workspace=frontend",
     "frontend:web": "npm run web --workspace=frontend"
