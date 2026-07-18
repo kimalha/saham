@@ -13,15 +13,15 @@ export interface StockAttributes {
 }
 
 export class Stock extends Model<StockAttributes> implements StockAttributes {
-  public id!: number;
-  public code!: string;
-  public name!: string;
-  public pe_ratio!: number;
-  public roe!: number;
-  public der!: number;
-  public dividend_yield!: number;
-  public readonly created_at!: Date;
-  public readonly updated_at!: Date;
+  declare id: number;
+  declare code: string;
+  declare name: string;
+  declare pe_ratio: number;
+  declare roe: number;
+  declare der: number;
+  declare dividend_yield: number;
+  declare readonly created_at: Date;
+  declare readonly updated_at: Date;
 }
 
 export function initStock(sequelize: Sequelize): typeof Stock {

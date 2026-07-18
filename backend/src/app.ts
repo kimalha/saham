@@ -1,5 +1,7 @@
-import express, { Application, Request, Response, NextFunction } from 'express';
+import express, { Application, Request, Response } from 'express';
 import dotenv from 'dotenv';
+import apiRouter from './routes';
+import { errorHandler } from './middlewares/error.middleware';
 
 dotenv.config();
 
@@ -8,7 +10,10 @@ const app: Application = express();
 // Middlewares
 app.use(express.json());
 
-// Routes Dasar untuk Testing Server
+// Routes API Utama
+app.use('/api', apiRouter);
+
+// Health Check Route
 app.get('/api/health', (req: Request, res: Response): void => {
   res.status(200).json({
     status: 'success',
@@ -20,18 +25,12 @@ app.get('/api/health', (req: Request, res: Response): void => {
 app.use('*', (req: Request, res: Response): void => {
   res.status(404).json({
     status: 'error',
-    message: 'Endpoint not found'
+    message: 'Endpoint tidak ditemukan',
+    code: 'ENDPOINT_NOT_FOUND'
   });
 });
 
 // Centralized error handler middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction): void => {
-  console.error(err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: 'Internal server error',
-    code: 'INTERNAL_SERVER_ERROR'
-  });
-});
+app.use(errorHandler);
 
 export default app;

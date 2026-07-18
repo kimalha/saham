@@ -10,12 +10,12 @@ export interface CriteriaAttributes {
 }
 
 export class Criteria extends Model<CriteriaAttributes> implements CriteriaAttributes {
-  public id!: number;
-  public code!: string;
-  public name!: string;
-  public type!: 'benefit' | 'cost';
-  public default_weight!: number;
-  public description?: string;
+  declare id: number;
+  declare code: string;
+  declare name: string;
+  declare type: 'benefit' | 'cost';
+  declare default_weight: number;
+  declare description?: string;
 }
 
 export function initCriteria(sequelize: Sequelize): typeof Criteria {

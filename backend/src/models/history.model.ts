@@ -12,14 +12,14 @@ export interface AnalysisHistoryAttributes {
 }
 
 export class AnalysisHistory extends Model<AnalysisHistoryAttributes> implements AnalysisHistoryAttributes {
-  public id!: number;
-  public title!: string;
-  public weight_pe!: number;
-  public weight_roe!: number;
-  public weight_der!: number;
-  public weight_div!: number;
-  public results_data!: unknown;
-  public readonly created_at!: Date;
+  declare id: number;
+  declare title: string;
+  declare weight_pe: number;
+  declare weight_roe: number;
+  declare weight_der: number;
+  declare weight_div: number;
+  declare results_data: unknown;
+  declare readonly created_at: Date;
 }
 
 export function initAnalysisHistory(sequelize: Sequelize): typeof AnalysisHistory {
