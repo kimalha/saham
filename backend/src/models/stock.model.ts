@@ -4,6 +4,7 @@ export interface StockAttributes {
   id?: number;
   code: string;
   name: string;
+  sector?: string;
   pe_ratio: number;
   roe: number;
   der: number;
@@ -16,6 +17,7 @@ export class Stock extends Model<StockAttributes> implements StockAttributes {
   declare id: number;
   declare code: string;
   declare name: string;
+  declare sector: string;
   declare pe_ratio: number;
   declare roe: number;
   declare der: number;
@@ -40,6 +42,11 @@ export function initStock(sequelize: Sequelize): typeof Stock {
       name: {
         type: DataTypes.STRING(100),
         allowNull: false
+      },
+      sector: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'Lainnya'
       },
       pe_ratio: {
         type: DataTypes.DECIMAL(10, 4),

@@ -53,7 +53,8 @@ export class StockRepository {
               pe_ratio: data.pe_ratio,
               roe: data.roe,
               der: data.der,
-              dividend_yield: data.dividend_yield
+              dividend_yield: data.dividend_yield,
+              sector: data.sector
             },
             { transaction }
           );

@@ -5,6 +5,7 @@ export interface StockData {
   id: number;
   code: string;
   name: string;
+  sector: string;
   pe_ratio: number;
   roe: number;
   der: number;

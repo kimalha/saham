@@ -11,6 +11,12 @@ export const createStockSchema = z.object({
       .string({ message: 'Nama perusahaan wajib diisi' })
       .min(2, 'Nama perusahaan minimal 2 karakter')
       .max(100, 'Nama perusahaan maksimal 100 karakter'),
+    sector: z
+      .string()
+      .min(2)
+      .max(50)
+      .optional()
+      .default('Lainnya'),
     pe_ratio: z
       .number({ message: 'PE Ratio harus berupa angka' }),
     roe: z
@@ -34,6 +40,7 @@ export const updateStockSchema = z.object({
       .regex(/^[A-Z0-9]+$/, 'Kode saham harus berupa huruf kapital alfanumerik')
       .optional(),
     name: z.string().min(2).max(100).optional(),
+    sector: z.string().min(2).max(50).optional(),
     pe_ratio: z.number().optional(),
     roe: z.number().optional(),
     der: z.number().optional(),

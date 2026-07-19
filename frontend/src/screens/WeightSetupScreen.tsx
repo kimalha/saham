@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,7 +7,9 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Alert
+  Alert as RNAlert,
+  TextInput,
+  Platform
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useStocks } from '../hooks/useStocks';
@@ -16,13 +18,38 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 
+// Polyfill Alert untuk Web agar tidak silent no-op
+const Alert = {
+  alert: (title: string, message?: string, buttons?: any[]) => {
+    if (Platform.OS === 'web') {
+      const msg = message ? `${title}\n\n${message}` : title;
+      if (buttons && buttons.length > 0) {
+        const confirmBtn = buttons.find(b => b.style === 'destructive' || b.text === 'Hapus' || b.text === 'OK');
+        const cancelBtn = buttons.find(b => b.style === 'cancel' || b.text === 'Batal');
+        const result = window.confirm(msg);
+        if (result && confirmBtn && typeof confirmBtn.onPress === 'function') {
+          confirmBtn.onPress();
+        } else if (!result && cancelBtn && typeof cancelBtn.onPress === 'function') {
+          cancelBtn.onPress();
+        }
+      } else {
+        window.alert(msg);
+      }
+    } else {
+      RNAlert.alert(title, message, buttons);
+    }
+  }
+};
+
 export default function WeightSetupScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { stocks, isLoading: isStocksLoading } = useStocks();
   const { runAnalysis, isAnalyzing } = useAnalysis();
 
-  // Selected stocks checklist state (default select all)
-  const [selectedStockIds, setSelectedStockIds] = useState<number[]>([]);
+  // Selected stocks state
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStocks, setSelectedStocks] = useState<any[]>([]);
 
   // Kriteria bobot (default 25% masing-masing)
   const [peWeight, setPeWeight] = useState(25);
@@ -33,21 +60,38 @@ export default function WeightSetupScreen() {
   // Judul simulasi kustom
   const [title, setTitle] = useState('');
 
-  useEffect(() => {
-    if (stocks.length > 0) {
-      setSelectedStockIds(stocks.map((s: any) => s.id));
-    }
-  }, [stocks]);
-
   const totalWeight = peWeight + roeWeight + derWeight + divWeight;
   const isWeightValid = Math.abs(totalWeight - 100) < 0.001;
-  const hasMinStocks = selectedStockIds.length >= 2;
+  const hasMinStocks = selectedStocks.length >= 2;
 
-  // Toggle selection saham
-  const toggleStock = (id: number) => {
-    setSelectedStockIds(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
+  // Mendapatkan daftar semua sektor unik secara dinamis dari database
+  const availableSectors = Array.from(new Set(stocks.map((s: any) => s.sector || 'Lainnya'))).sort();
+
+  // Memfilter saham berdasarkan sektor yang dipilih
+  const stocksInSelectedSectors = stocks.filter(stock => 
+    selectedSectors.length > 0 && selectedSectors.includes(stock.sector || 'Lainnya')
+  );
+
+  // Memfilter saham berdasarkan pencarian nama/kode di dalam sektor terpilih (Opsional)
+  const filteredSearchStocks = stocksInSelectedSectors.filter(stock => {
+    const matchesSearch = stock.code.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          stock.name.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Toggle pilihan sektor
+  const toggleSector = (sector: string) => {
+    setSelectedSectors(prev => {
+      const nextSectors = prev.includes(sector) ? prev.filter(s => s !== sector) : [...prev, sector];
+      
+      // Bersihkan selectedStocks yang tidak lagi termasuk dalam sektor terpilih
+      const updatedSelectedStocks = selectedStocks.filter(stock => 
+        nextSectors.includes(stock.sector || 'Lainnya')
+      );
+      setSelectedStocks(updatedSelectedStocks);
+      
+      return nextSectors;
+    });
   };
 
   // Jalankan perhitungan TOPSIS
@@ -57,14 +101,14 @@ export default function WeightSetupScreen() {
       return;
     }
 
-    if (!hasMinStocks) {
+    if (selectedStocks.length < 2) {
       Alert.alert('Peringatan', 'Pilih minimal 2 saham alternatif untuk dianalisis');
       return;
     }
 
     const payload = {
       title: title.trim() || `Analisis ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`,
-      stock_ids: selectedStockIds,
+      stock_ids: selectedStocks.map(s => s.id),
       weights: {
         pe_ratio: peWeight,
         roe: roeWeight,
@@ -206,42 +250,130 @@ export default function WeightSetupScreen() {
           </View>
         </View>
 
-        {/* Bagian 2: Checklist Saham */}
+        {/* Bagian 2: Pemilihan Alternatif Saham */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>2. Alternatif Saham Terpilih</Text>
-          <Text style={styles.sectionDesc}>Pilih saham fundamental yang ingin dibandingkan (min. 2):</Text>
+          <Text style={styles.sectionTitle}>2. Pilih Alternatif Saham</Text>
+          <Text style={styles.sectionDesc}>Filter berdasarkan sektor, lalu pilih saham yang ingin dibandingkan (min. 2)</Text>
           <View style={styles.divider} />
 
           {stocks.length > 0 ? (
-            <View style={styles.checkboxGrid}>
-              {stocks.map((stock: any) => {
-                const isSelected = selectedStockIds.includes(stock.id);
-                return (
-                  <Pressable
-                    key={stock.id}
-                    style={[styles.checkboxItem, isSelected && styles.checkboxItemActive]}
-                    onPress={() => toggleStock(stock.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.checkboxCode,
-                        isSelected ? styles.checkboxCodeActive : styles.checkboxCodeInactive
-                      ]}
-                    >
-                      {stock.code}
+            <View style={styles.stepContainer}>
+              
+              {/* LANGKAH 1: PILIH SEKTOR */}
+              <View style={styles.stepBlock}>
+                <Text style={styles.stepLabel}>Langkah 1: Pilih Sektor Saham</Text>
+                <View style={styles.sectorGrid}>
+                  {availableSectors.map(sector => {
+                    const isChecked = selectedSectors.includes(sector);
+                    return (
+                      <Pressable
+                        key={sector}
+                        style={[
+                          styles.sectorCheckboxItem,
+                          isChecked && styles.sectorCheckboxItemActive
+                        ]}
+                        onPress={() => toggleSector(sector)}
+                      >
+                        <Text style={[styles.checkboxBox, isChecked && styles.checkboxBoxActive]}>
+                          {isChecked ? '✓' : ' '}
+                        </Text>
+                        <Text style={[styles.sectorText, isChecked && styles.sectorTextActive]}>
+                          {sector}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* LANGKAH 2: DAFTAR SAHAM & SEARCH */}
+              <View style={styles.stepBlock}>
+                <View style={styles.selectedHeaderRow}>
+                  <Text style={styles.stepLabel}>Langkah 2: Pilih Saham Alternatif</Text>
+                  {selectedStocks.length > 0 && (
+                    <View style={styles.badgeContainer}>
+                      <Text style={styles.badgeText}>{selectedStocks.length} Terpilih</Text>
+                    </View>
+                  )}
+                </View>
+
+                {selectedSectors.length > 0 ? (
+                  <View style={styles.stocksSelectionArea}>
+                    {/* Search box (Filter Tambahan) */}
+                    <TextInput
+                      style={styles.searchInputCompact}
+                      placeholder="🔍 Cari kode atau nama saham (Opsional)..."
+                      placeholderTextColor="#9CA3AF"
+                      value={searchTerm}
+                      onChangeText={setSearchTerm}
+                      autoCapitalize="characters"
+                    />
+
+                    {/* Horizontal Selected Chips */}
+                    {selectedStocks.length > 0 && (
+                      <View style={styles.selectedChipsWrapper}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectedChipsScroll}>
+                          {selectedStocks.map(stock => (
+                            <Pressable
+                              key={stock.id}
+                              style={styles.selectedChip}
+                              onPress={() => setSelectedStocks(selectedStocks.filter(s => s.id !== stock.id))}
+                            >
+                              <Text style={styles.selectedChipText}>{stock.code}</Text>
+                              <Text style={styles.selectedChipClose}>✕</Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+
+                    {/* Stock list */}
+                    <View style={styles.stockItemGrid}>
+                      {filteredSearchStocks.length > 0 ? (
+                        filteredSearchStocks.map(stock => {
+                          const isSelected = selectedStocks.some(s => s.id === stock.id);
+                          return (
+                            <Pressable
+                              key={stock.id}
+                              style={[
+                                styles.stockItemRow,
+                                isSelected && styles.stockItemRowActive
+                              ]}
+                              onPress={() => {
+                                if (isSelected) {
+                                  setSelectedStocks(selectedStocks.filter(s => s.id !== stock.id));
+                                } else {
+                                  setSelectedStocks([...selectedStocks, stock]);
+                                }
+                              }}
+                            >
+                              <View style={styles.stockItemLeft}>
+                                <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleActive]}>
+                                  {isSelected && <Text style={styles.checkboxCheckText}>✓</Text>}
+                                </View>
+                                <View style={styles.stockItemTextWrapper}>
+                                  <Text style={styles.stockItemCode}>{stock.code}</Text>
+                                  <Text style={styles.stockItemName} numberOfLines={1}>{stock.name}</Text>
+                                  <Text style={styles.stockItemSector}>Sektor: {stock.sector}</Text>
+                                </View>
+                              </View>
+                            </Pressable>
+                          );
+                        })
+                      ) : (
+                        <Text style={styles.noResultsText}>Tidak ada saham yang cocok di sektor terpilih</Text>
+                      )}
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.sectorWarningCard}>
+                    <Text style={styles.sectorWarningText}>
+                      ⚠️ Silakan pilih minimal satu sektor di Langkah 1 untuk menampilkan daftar saham.
                     </Text>
-                    <Text
-                      style={[
-                        styles.checkboxName,
-                        isSelected ? styles.checkboxNameActive : styles.checkboxNameInactive
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {stock.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+                  </View>
+                )}
+              </View>
+
             </View>
           ) : (
             <Text style={styles.emptyText}>Data saham kosong. Harap isi data terlebih dahulu di tab Kelola Saham.</Text>
@@ -372,42 +504,195 @@ const styles = StyleSheet.create({
   statusInvalidText: {
     color: '#EF4444',
   },
-  checkboxGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  stepContainer: {
+    gap: 16,
+  },
+  stepBlock: {
     gap: 8,
   },
-  checkboxItem: {
-    width: '48%',
+  stepLabel: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#F3F4F6',
+  },
+  sectorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  sectorCheckboxItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0B0F19',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    borderRadius: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  sectorCheckboxItemActive: {
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59, 130, 246, 0.08)',
+  },
+  checkboxBox: {
+    width: 16,
+    height: 16,
+    borderWidth: 1.5,
+    borderColor: '#9CA3AF',
+    borderRadius: 3,
+    textAlign: 'center',
+    lineHeight: 12,
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#3B82F6',
+  },
+  checkboxBoxActive: {
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  sectorText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  sectorTextActive: {
+    color: '#F3F4F6',
+    fontWeight: '500',
+  },
+  selectedHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  badgeContainer: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  badgeText: {
+    color: '#F3F4F6',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  stocksSelectionArea: {
+    gap: 8,
+  },
+  searchInputCompact: {
+    backgroundColor: '#0B0F19',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    borderRadius: 8,
+    height: 38,
+    paddingHorizontal: 10,
+    color: '#F3F4F6',
+    fontSize: 13,
+  },
+  selectedChipsWrapper: {
+    height: 34,
+    justifyContent: 'center',
+  },
+  selectedChipsScroll: {
+    gap: 6,
+    alignItems: 'center',
+  },
+  selectedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  selectedChipText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#10B981',
+  },
+  selectedChipClose: {
+    fontSize: 10,
+    color: '#EF4444',
+    fontWeight: 'bold',
+  },
+  stockItemGrid: {
+    gap: 6,
+    marginTop: 4,
+  },
+  stockItemRow: {
     backgroundColor: '#0B0F19',
     borderWidth: 1,
     borderColor: '#1F2937',
     borderRadius: 8,
     padding: 10,
   },
-  checkboxItemActive: {
-    borderColor: '#3B82F6',
-    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+  stockItemRowActive: {
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.03)',
   },
-  checkboxCode: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  stockItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  checkboxCodeActive: {
-    color: '#3B82F6',
+  checkboxCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: '#9CA3AF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  checkboxCodeInactive: {
-    color: '#9CA3AF',
+  checkboxCircleActive: {
+    borderColor: '#10B981',
+    backgroundColor: '#10B981',
   },
-  checkboxName: {
+  checkboxCheckText: {
+    color: '#0B0F19',
     fontSize: 10,
-    marginTop: 2,
+    fontWeight: 'bold',
+    lineHeight: 12,
   },
-  checkboxNameActive: {
+  stockItemTextWrapper: {
+    flex: 1,
+  },
+  stockItemCode: {
+    fontSize: 13,
+    fontWeight: 'bold',
     color: '#F3F4F6',
   },
-  checkboxNameInactive: {
+  stockItemName: {
+    fontSize: 11,
     color: '#9CA3AF',
+    marginTop: 1,
+  },
+  stockItemSector: {
+    fontSize: 9,
+    color: '#3B82F6',
+    marginTop: 1,
+  },
+  noResultsText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: 10,
+  },
+  sectorWarningCard: {
+    backgroundColor: 'rgba(59, 130, 246, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  sectorWarningText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
   emptyText: {
     color: '#9CA3AF',
